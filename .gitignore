@@ -1,0 +1,15 @@
+# Ignorar directorios locales de inicialización
+**/.terraform/*
+
+# Ignorar archivos de estado de Terraform (Evita fugas de información)
+*.tfstate
+*.tfstate.*
+
+# Ignorar logs de errores
+crash.log
+crash.*.log
+
+# Ignorar caché y entornos de Python para Boto3/FastAPI
+__pycache__/
+*.py[cod]
+.env
