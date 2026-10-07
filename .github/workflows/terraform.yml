@@ -10,40 +10,52 @@ env:
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   AWS_REGION: "us-east-1"
+  TERRAFORM_VERSION: "1.10.5"
 
 jobs:
-  terraform:
-    name: 'Terraform Plan & Apply'
+  validate:
+    name: 'Terraform Format & Lint'
     runs-on: ubuntu-latest
-    
-    # Apunta al entorno que se desplegará en la Fase 1
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Verificar Formato (Recursivo)
+        run: terraform fmt -check -recursive ./terraform
+
+  terraform-primary:
+    name: 'Terraform Plan & Apply - Primary (us-east-1)'
+    needs: [validate]
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./terraform/environments/primary_us_east_1
 
     steps:
-    - name: Checkout del repositorio
-      uses: actions/checkout@v3
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
 
-    - name: Configurar Terraform
-      uses: hashicorp/setup-terraform@v2
-      with:
-        terraform_version: 1.5.0
+      - name: Configurar Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
 
-    - name: Terraform Init
-      run: terraform init
+      - name: Terraform Init
+        run: terraform init
 
-    - name: Terraform Format
-      run: terraform fmt -check
+      - name: Terraform Validate
+        run: terraform validate
 
-    - name: Terraform Validate
-      run: terraform validate
+      - name: Terraform Plan
+        id: plan
+        if: github.event_name == 'pull_request'
+        run: terraform plan -no-color
 
-    - name: Terraform Plan
-      id: plan
-      if: github.event_name == 'pull_request'
-      run: terraform plan -no-color
-
-    - name: Terraform Apply
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-      run: terraform apply -auto-approve
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: terraform apply -auto-approve

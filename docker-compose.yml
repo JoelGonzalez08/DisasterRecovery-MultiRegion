@@ -1,0 +1,45 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: dr-local-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: transactions_db
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: password
+    ports:
+      - "3307:3306" # Mapeado a 3307 en el host para no colisionar con el MySQL local de Windows
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "admin", "-ppassword"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: dr-api-service
+    restart: on-failure
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_USER=admin
+      - DB_PASS=password
+      - DB_NAME=transactions_db
+      - DYNAMO_TABLE=user_sessions
+      - S3_BUCKET=dr-invoice-bucket
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=mock_key
+      - AWS_SECRET_ACCESS_KEY=mock_secret
+    ports:
+      - "8000:8000"
+
+volumes:
+  mysql_data:
