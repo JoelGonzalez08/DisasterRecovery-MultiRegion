@@ -29,19 +29,23 @@ DB_NAME = os.getenv("DB_NAME", "transactions_db")
 DYNAMO_TABLE = os.getenv("DYNAMO_TABLE", "user_sessions")
 S3_BUCKET = os.getenv("S3_BUCKET", "dr-invoice-bucket")
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+AWS_ENDPOINT_URL = os.getenv("AWS_ENDPOINT_URL") or None
 
 # --------------------------------------------------------------------------
 # Configuración de SQLAlchemy (Capa Relacional - RDS MySQL)
 # --------------------------------------------------------------------------
-DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    f"mysql+pymysql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+)
 
 # pool_pre_ping=True verifica la conexión antes de usarla (ideal ante failovers)
-engine = create_engine(
-    DATABASE_URL,
-    pool_pre_ping=True,
-    pool_recycle=3600,
-    connect_args={"connect_timeout": 5}
-)
+engine_kwargs = {"pool_pre_ping": True}
+if DATABASE_URL.startswith("mysql"):
+    engine_kwargs["pool_recycle"] = 3600
+    engine_kwargs["connect_args"] = {"connect_timeout": 5}
+
+engine = create_engine(DATABASE_URL, **engine_kwargs)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -57,25 +61,48 @@ class TransactionModel(Base):
     region = Column(String(32), default=AWS_REGION)
 
 
+# --------------------------------------------------------------------------
+# Clientes AWS Boto3 (DynamoDB y S3)
+# --------------------------------------------------------------------------
+dynamodb = boto3.client("dynamodb", region_name=AWS_REGION, endpoint_url=AWS_ENDPOINT_URL)
+s3 = boto3.client("s3", region_name=AWS_REGION, endpoint_url=AWS_ENDPOINT_URL)
+
+
 def init_db():
-    """Intenta inicializar las tablas en la BD relacional."""
+    """Intenta inicializar las tablas en la BD relacional y recursos locales si aplica."""
     try:
         Base.metadata.create_all(bind=engine)
     except Exception as e:
         # No bloquear el arranque de la API si la BD aún está inicializándose
         print(f"[WARN] No se pudo inicializar la base de datos relacional: {e}")
 
+    # Si se usa un emulador local (LocalStack en docker-compose), asegurar tabla y bucket
+    if AWS_ENDPOINT_URL:
+        try:
+            dynamodb.describe_table(TableName=DYNAMO_TABLE)
+        except Exception:
+            try:
+                dynamodb.create_table(
+                    TableName=DYNAMO_TABLE,
+                    KeySchema=[{"AttributeName": "user_id", "KeyType": "HASH"}],
+                    AttributeDefinitions=[{"AttributeName": "user_id", "AttributeType": "S"}],
+                    BillingMode="PAY_PER_REQUEST",
+                )
+            except Exception as e:
+                print(f"[WARN] No se pudo crear tabla local en LocalStack: {e}")
+
+        try:
+            s3.head_bucket(Bucket=S3_BUCKET)
+        except Exception:
+            try:
+                s3.create_bucket(Bucket=S3_BUCKET)
+            except Exception as e:
+                print(f"[WARN] No se pudo crear bucket local en LocalStack: {e}")
+
 
 @app.on_event("startup")
 def on_startup():
     init_db()
-
-
-# --------------------------------------------------------------------------
-# Clientes AWS Boto3 (DynamoDB y S3)
-# --------------------------------------------------------------------------
-dynamodb = boto3.client("dynamodb", region_name=AWS_REGION)
-s3 = boto3.client("s3", region_name=AWS_REGION)
 
 
 # --------------------------------------------------------------------------
@@ -253,7 +280,7 @@ def get_cart(user_id: str):
         )
         if "Item" not in response:
             raise HTTPException(status_code=404, detail="Carrito no encontrado")
-        
+
         item = response["Item"]
         return {
             "user_id": item.get("user_id", {}).get("S"),

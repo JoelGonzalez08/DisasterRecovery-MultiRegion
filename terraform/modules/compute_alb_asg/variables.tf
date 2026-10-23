@@ -104,6 +104,12 @@ variable "aws_region" {
   type        = string
 }
 
+variable "git_branch" {
+  description = "Rama del repositorio Git a clonar en el arranque de las instancias EC2"
+  type        = string
+  default     = "main"
+}
+
 variable "tags" {
   description = "Etiquetas comunes"
   type        = map(string)
