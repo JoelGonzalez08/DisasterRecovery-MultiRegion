@@ -82,4 +82,11 @@ resource "aws_db_instance" "this" {
       Role        = var.is_read_replica ? "Read-Replica" : "Primary-Writer"
     }
   )
+
+  # Evita recrear la base de datos en caso de que la Read Replica sea promovida a Writer en un Failover
+  lifecycle {
+    ignore_changes = [
+      replicate_source_db
+    ]
+  }
 }

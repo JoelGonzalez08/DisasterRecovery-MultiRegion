@@ -77,6 +77,13 @@ resource "aws_dynamodb_table" "user_sessions" {
     Environment = var.environment
     Region      = var.aws_region
   }
+
+  # Permite que el entorno secondary_us_west_2 gestione su propia réplica de Global Table sin conflicto
+  lifecycle {
+    ignore_changes = [
+      replica
+    ]
+  }
 }
 
 # 4. Base de Datos Relacional RDS MySQL (Multi-AZ Primario Writer)

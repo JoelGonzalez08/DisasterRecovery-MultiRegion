@@ -8,6 +8,16 @@ output "alb_arn" {
   value       = module.compute_alb_asg.alb_arn
 }
 
+output "alb_zone_id" {
+  description = "Canonical Hosted Zone ID del ALB primario (para Route 53 Alias en Fase 3)"
+  value       = module.compute_alb_asg.alb_zone_id
+}
+
+output "rds_instance_id" {
+  description = "ID de la instancia RDS primaria"
+  value       = module.database_rds.db_instance_id
+}
+
 output "rds_endpoint" {
   description = "Endpoint de conexión de RDS MySQL (Escritor Multi-AZ)"
   value       = module.database_rds.db_endpoint

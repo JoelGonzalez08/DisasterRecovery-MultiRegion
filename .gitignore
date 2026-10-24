@@ -1,9 +1,11 @@
 # Ignorar directorios locales de inicialización
 **/.terraform/*
 
-# Ignorar archivos de estado de Terraform (Evita fugas de información)
+# Ignorar archivos de estado y planes compilados de Terraform (Evita fugas de información)
 *.tfstate
 *.tfstate.*
+*.tfplan
+tfplan
 
 # Ignorar logs de errores
 crash.log

@@ -20,6 +20,24 @@ variable "enable_force_destroy" {
   default     = true
 }
 
+variable "enable_replication" {
+  description = "Habilitar Cross-Region Replication (CRR) hacia un bucket destino"
+  type        = bool
+  default     = false
+}
+
+variable "destination_bucket_arn" {
+  description = "ARN del bucket S3 destino en la región secundaria para CRR"
+  type        = string
+  default     = null
+}
+
+variable "destination_storage_class" {
+  description = "Clase de almacenamiento en el bucket destino para objetos replicados"
+  type        = string
+  default     = "STANDARD"
+}
+
 variable "tags" {
   description = "Etiquetas comunes para el bucket"
   type        = map(string)

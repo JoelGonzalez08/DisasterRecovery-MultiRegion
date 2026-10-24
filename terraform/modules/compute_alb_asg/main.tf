@@ -242,7 +242,7 @@ resource "aws_launch_template" "this" {
               # 2. Descargar código fuente de la aplicación
               mkdir -p /opt/app
               cd /opt/app
-              git clone https://github.com/JoelGonzalez08/DisasterRecovery-MultiRegion.git repo || true
+              git clone -b ${var.git_branch} https://github.com/JoelGonzalez08/DisasterRecovery-MultiRegion.git repo || git clone https://github.com/JoelGonzalez08/DisasterRecovery-MultiRegion.git repo || true
 
               if [ -d "/opt/app/repo/api" ]; then
                 cd /opt/app/repo/api
@@ -315,6 +315,6 @@ resource "aws_autoscaling_group" "this" {
 
   lifecycle {
     create_before_destroy = true
-    ignore_changes        = [desired_capacity]
+    ignore_changes        = [desired_capacity, min_size]
   }
 }
