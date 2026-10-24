@@ -14,7 +14,7 @@ env:
 
 jobs:
   validate:
-    name: 'Terraform Format & Lint'
+    name: 'Terraform Format & Static Validation'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout del repositorio
@@ -28,9 +28,28 @@ jobs:
       - name: Verificar Formato (Recursivo)
         run: terraform fmt -check -recursive ./terraform
 
+      - name: Validar Fase 1 - Primary (us-east-1)
+        working-directory: ./terraform/environments/primary_us_east_1
+        run: |
+          terraform init -backend=false
+          terraform validate
+
+      - name: Validar Fase 2 - Secondary Warm Standby (us-west-2)
+        working-directory: ./terraform/environments/secondary_us_west_2
+        run: |
+          terraform init -backend=false
+          terraform validate
+
+      - name: Validar Fase 3 - Global (Route 53 & CloudFront)
+        working-directory: ./terraform/environments/global
+        run: |
+          terraform init -backend=false
+          terraform validate
+
   terraform-primary:
     name: 'Terraform Plan & Apply - Primary (us-east-1)'
     needs: [validate]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -52,17 +71,15 @@ jobs:
         run: terraform validate
 
       - name: Terraform Plan
-        id: plan
-        if: github.event_name == 'pull_request' || github.ref != 'refs/heads/main'
         run: terraform plan -no-color
 
       - name: Terraform Apply
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: terraform apply -auto-approve
 
   terraform-secondary:
     name: 'Terraform Plan & Apply - Secondary Warm Standby (us-west-2)'
     needs: [terraform-primary]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -84,17 +101,15 @@ jobs:
         run: terraform validate
 
       - name: Terraform Plan
-        id: plan
-        if: github.event_name == 'pull_request' || github.ref != 'refs/heads/main'
         run: terraform plan -no-color
 
       - name: Terraform Apply
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: terraform apply -auto-approve
 
   terraform-global:
     name: 'Terraform Plan & Apply - Global (Route 53 & CloudFront)'
     needs: [terraform-secondary]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -116,10 +131,7 @@ jobs:
         run: terraform validate
 
       - name: Terraform Plan
-        id: plan
-        if: github.event_name == 'pull_request' || github.ref != 'refs/heads/main'
         run: terraform plan -no-color
 
       - name: Terraform Apply
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: terraform apply -auto-approve
